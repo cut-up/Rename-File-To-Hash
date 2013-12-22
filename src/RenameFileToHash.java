@@ -79,7 +79,7 @@ public class RenameFileToHash {
         }
         newName.append(hash);
         if (file.getName().lastIndexOf(".") != -1) {
-            return new File(newName.append(file.getName().substring(file.getName().lastIndexOf(".")).toLowerCase()).toString());
+            newName.append(file.getName().substring(file.getName().lastIndexOf(".")).toLowerCase()).toString();
         }
         return new File(newName.toString());
     }
