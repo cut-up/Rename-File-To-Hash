@@ -12,32 +12,35 @@ public class RenameFileToHash {
     private final Scanner scanner;
     private File[] listFiles;
     private MessageDigest messageDigest;
+    private String[] option;
     private int radix, numberMask, number, change;
+    private boolean sort;
 
     private RenameFileToHash() {
-        this.scanner = new Scanner(System.in);
+        scanner = new Scanner(System.in);
     }
 
     public RenameFileToHash(String[] arguments) {
         this();
-        this.setAlgorithm(arguments);
-        this.setListFiles(arguments);
+        option = arguments;
+        setAlgorithm();
+        setListFiles();
     }
 
     public static void main(String[] args) {
-        final RenameFileToHash renameToHash = new RenameFileToHash(args);
+        final RenameFileToHash renameFileToHash = new RenameFileToHash(args);
         File newFile;
-        for (File oldFile : renameToHash.getListFiles()) {
-            newFile = renameToHash.getNewFile(oldFile, renameToHash.getHash(oldFile));
-            if (!renameToHash.isDuplicate(oldFile, newFile) && oldFile.renameTo(newFile)) {
+        for (File oldFile : renameFileToHash.getListFiles()) {
+            newFile = renameFileToHash.getNewFile(oldFile, renameFileToHash.getHash(oldFile));
+            if (!renameFileToHash.isDuplicate(oldFile, newFile) && oldFile.renameTo(newFile)) {
                 System.out.printf("%s is renamed to %s.\n", oldFile.getName(), newFile.getName());
             }
         }
-        System.out.printf("%s of %s files renamed.\n", renameToHash.getChange(), renameToHash.getListFiles().length);
+        System.out.printf("%s of %s files renamed.\n", renameFileToHash.getChange(), renameFileToHash.getListFiles().length);
     }
 
     public int getChange() {
-        return this.change;
+        return change;
     }
 
     public String getHash(File file) {
@@ -61,25 +64,25 @@ public class RenameFileToHash {
             }
         }
         hash = new BigInteger(1, messageDigest.digest()).toString(16);
-        if (hash.length() != this.radix) {
-            hash = String.format("%0" + (this.radix - hash.length()) + "d%s", 0, hash);
+        if (hash.length() != radix) {
+            hash = String.format("%0" + (radix - hash.length()) + "d%s", 0, hash);
         }
         return hash;
     }
 
     public File[] getListFiles() {
-        return this.listFiles;
+        return listFiles;
     }
 
     public File getNewFile(File file, String hash) {
-        StringBuilder newName = new StringBuilder();
+        final StringBuilder newName = new StringBuilder();
         newName.append(file.getPath().substring(0, file.getPath().lastIndexOf(file.getName())));
-        if (this.numberMask != 0) {
-            newName.append(String.format("%0" + this.numberMask + "d-", ++this.number));
+        if (sort) {
+            newName.append(String.format("%0" + numberMask + "d-", ++number));
         }
         newName.append(hash);
         if (file.getName().lastIndexOf(".") != -1) {
-            newName.append(file.getName().substring(file.getName().lastIndexOf(".")).toLowerCase()).toString();
+            newName.append(file.getName().substring(file.getName().lastIndexOf(".")).toLowerCase());
         }
         return new File(newName.toString());
     }
@@ -91,39 +94,56 @@ public class RenameFileToHash {
             }
             return true;
         }
-        this.change++;
+        change++;
         return false;
     }
 
-    private void setAlgorithm(String[] arguments) {
+    private String searchOperand(String search) {
         try {
-            if (arguments.length > 1) {
-                this.messageDigest = MessageDigest.getInstance(arguments[1]);
+            for (int i = 0; i < option.length; i++) {
+                if (option[i].equals(search)) {
+                    if (option[i].equals("-n")) {
+                        return option[i];
+                    }
+                    return option[i + 1];
+                }
+            }
+        } catch (ArrayIndexOutOfBoundsException exception) {
+            System.out.printf("%s: missing operand.\n", search);
+        }
+        return null;
+    }
+
+    private void setAlgorithm() {
+        final String algorithm = searchOperand("-a");
+        try {
+            if (algorithm != null) {
+                messageDigest = MessageDigest.getInstance(algorithm);
             }
         } catch (NoSuchAlgorithmException exception) {
-            System.out.printf("%s unsupported. Selected MD5.\n", arguments[1]);
+            System.out.printf("%s unsupported. Selected MD5.\n", algorithm);
         } finally {
-            if (this.messageDigest == null) {
+            if (messageDigest == null) {
                 try {
-                    this.messageDigest = MessageDigest.getInstance("MD5");
+                    messageDigest = MessageDigest.getInstance("MD5");
                 } catch (NoSuchAlgorithmException exception) {
                     exception.printStackTrace();
                 }
             }
         }
-        this.radix = messageDigest.digest().length * 2;
+        radix = messageDigest.digest().length * 2;
     }
 
-    private void setListFiles(String[] arguments) {
-        File path = arguments.length != 0 ? new File(arguments[0]) : new File(".");
+    private void setListFiles() {
+        File path = option.length != 0 ? new File(option[option.length - 1]) : new File(".");
         while (!path.isFile() && !path.isDirectory()) {
             System.out.printf("No such file or directory.\nPath: ");
             path = new File(scanner.nextLine());
         }
         if (path.isFile()) {
-            this.listFiles = new File[]{path};
+            listFiles = new File[]{path};
         } else {
-            this.listFiles = path.listFiles(new FileFilter() {
+            listFiles = path.listFiles(new FileFilter() {
                 private String answer = "";
 
                 public boolean accept(File file) {
@@ -137,8 +157,9 @@ public class RenameFileToHash {
                     return false;
                 }
             });
-            Arrays.sort(this.listFiles);
-            this.numberMask = ("" + this.listFiles.length).length();
+            Arrays.sort(listFiles);
+            numberMask = ("" + listFiles.length).length();
+            sort = searchOperand("-n") != null;
         }
     }
 }
